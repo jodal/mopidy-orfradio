@@ -41,7 +41,7 @@ dev = [
 ]
 ruff = ["ruff"]
 tests = ["pytest", "pytest-cov"]
-typing = ["pyright"]
+typing = ["pyright", "ty"]
 
 
 [tool.coverage.paths]
@@ -120,6 +120,7 @@ env_list = [
     "pyright",
     "ruff-check",
     "ruff-format",
+    "ty",
 ]
 
 [tool.tox.env_run_base]
@@ -148,3 +149,7 @@ commands = [["ruff", "check", "{posargs:.}"]]
 skip_install = true
 dependency_groups = ["ruff"]
 commands = [["ruff", "format", "--check", "--diff", "{posargs:.}"]]
+
+[tool.tox.env.ty]
+dependency_groups = ["typing"]
+commands = [["ty", "check", "{posargs:src}"]]
