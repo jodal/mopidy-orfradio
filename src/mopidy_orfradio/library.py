@@ -186,5 +186,5 @@ class ORFLibraryProvider(backend.LibraryProvider):
         ]
 
     @override
-    def refresh(self, uri: Uri | None = None):
+    def refresh(self, uri: Uri | None = None) -> None:
         self.client.refresh()

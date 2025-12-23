@@ -27,7 +27,7 @@ class ORFPlaybackProvider(backend.PlaybackProvider):
         audio: AudioProxy,
         backend: ORFBackend,
         client: ORFClient | None = None,
-    ):
+    ) -> None:
         super().__init__(audio, backend)
         self.client = client or ORFClient(backend=self.backend)
 

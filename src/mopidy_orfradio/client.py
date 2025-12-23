@@ -5,7 +5,7 @@ import json
 import logging
 import re
 import urllib.request
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import dateutil.parser
 from beaker.cache import CacheManager
@@ -72,7 +72,7 @@ class ORFClient:
         *,
         station: str,
         day: dt.date,
-    ):
+    ) -> list[dict[str, Any]]:
         day_rec = self._get_day_json(
             station=station,
             day=day,
@@ -80,17 +80,25 @@ class ORFClient:
         if not day_rec:
             return []
 
-        def now(offset):
+        def now(offset: float) -> dt.datetime:
             return dt.datetime.now(dt.timezone(dt.timedelta(milliseconds=offset)))
 
         return [
             _to_show(broadcast_rec)
             for broadcast_rec in day_rec["broadcasts"]
-            if dateutil.parser.parse(broadcast_rec["startISO"])
-            < now(broadcast_rec["endOffset"])
+            if (
+                dateutil.parser.parse(broadcast_rec["startISO"])
+                < now(broadcast_rec["endOffset"])
+            )
         ]
 
-    def get_show(self, *, station: str, day: dt.date, show_id: str):
+    def get_show(
+        self,
+        *,
+        station: str,
+        day: dt.date,
+        show_id: str,
+    ) -> list[dict[str, Any]]:
         show_rec = self._get_record_json(
             station=station,
             day=day,
@@ -158,7 +166,7 @@ class ORFClient:
         day: dt.date,
         show_id: str,
         item_id: str,
-    ):
+    ) -> dict[str, Any]:
         show = self.get_show(
             station=station,
             day=day,
@@ -209,10 +217,10 @@ class ORFClient:
             )
         )
 
-    def refresh(self):
+    def refresh(self) -> None:
         self.http_client.refresh()
 
-    def _get_json(self, uri: str) -> dict | None:
+    def _get_json(self, uri: str) -> dict[str, Any] | None:
         content = self.http_client.get(uri)
         if content is None:
             return None
@@ -230,7 +238,7 @@ class ORFClient:
         *,
         station: str,
         day: dt.date,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         json = self._get_archive_json(station=station)
         if json is None:
             return None
@@ -242,13 +250,13 @@ class ORFClient:
         station: str,
         day: dt.date,
         show_id: str,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         return self._get_json(
             ORFClient.record_uri % (station, show_id, f"{day:%Y%m%d}")
         )
 
 
-def _to_show(rec):
+def _to_show(rec: dict[str, Any]) -> dict[str, Any]:
     time = dateutil.parser.parse(rec["scheduledISO"])
 
     # Note: items with times < 06:00 are from the next day and should be last
@@ -259,7 +267,7 @@ def _to_show(rec):
     }
 
 
-def _generic_title(track):
+def _generic_title(track: dict[str, Any]) -> str:
     types = {
         "M": "Musik ",
         "B": "Beitrag ",
@@ -272,7 +280,7 @@ def _generic_title(track):
     return types.get(track["type"], "") + "ohne Namen"
 
 
-def _generate_id(show_rec, i):
+def _generate_id(show_rec: dict[str, Any], i: int) -> str:
     start = show_rec["items"][i]["start"]
     if i + 1 < len(show_rec["items"]):
         end = show_rec["items"][i + 1]["start"]
@@ -280,7 +288,7 @@ def _generate_id(show_rec, i):
     return f"{start}"
 
 
-def _calculate_length(show_rec, i):
+def _calculate_length(show_rec: dict[str, Any], i: int) -> int:
     start = show_rec["items"][i]["start"]
     end = (
         show_rec["items"][i + 1]["start"]
@@ -290,7 +298,7 @@ def _calculate_length(show_rec, i):
     return end - start
 
 
-def _mojibake(s):
+def _mojibake(s: str) -> str:
     """
     The API sometimes returns titles with characters in the C1 control block.
     """

@@ -18,7 +18,7 @@ class Station:
 
 
 class InvalidORFUriError(TypeError):
-    def __init__(self, uri: str):
+    def __init__(self, uri: str) -> None:
         super().__init__(f"The URI is not a valid ORFLibraryUri: {uri!r}")
 
 

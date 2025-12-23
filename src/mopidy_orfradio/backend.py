@@ -17,7 +17,11 @@ class ORFBackend(pykka.ThreadingActor, backend.Backend):
     uri_schemes: ClassVar[list[UriScheme]] = [UriScheme("orfradio")]
     config: config_lib.ConfigDict
 
-    def __init__(self, config: config_lib.Config, audio: AudioProxy):
+    def __init__(
+        self,
+        config: config_lib.Config,
+        audio: AudioProxy,
+    ) -> None:
         super().__init__()
 
         self.config = cast("config_lib.ConfigDict", config)
