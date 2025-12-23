@@ -1,30 +1,37 @@
+import datetime as dt
 import unittest
 from unittest.mock import Mock
 
-from mopidy_orfradio.playback import ORFLibraryUri, ORFPlaybackProvider, ORFUriType
+from mopidy.types import Uri
+
+from mopidy_orfradio.playback import ORFPlaybackProvider
+from mopidy_orfradio.types import ORFArchiveItemUri, ORFLiveUri, ORFStationUri
 
 
 class ORFLibraryUriTest(unittest.TestCase):
     def test_playback_archive_item(self):
-        library_uri = ORFLibraryUri(
-            ORFUriType.ARCHIVE_ITEM, "oe1", "20140914", "1234567"
-        )
+        library_uri = ORFArchiveItemUri(
+            station="oe1",
+            day=dt.date(2014, 9, 14),
+            show_id="1234567",
+            item_id="1633035600-1633039200",
+        ).uri
         client_mock = Mock()
         client_mock.get_item_url = Mock(return_value="result_uri")
         playback = ORFPlaybackProvider(None, None, client=client_mock)
 
-        result = playback.translate_uri(str(library_uri))
+        result = playback.translate_uri(library_uri)
 
         assert result == "result_uri"
 
     def test_playback_live(self):
-        library_uri = ORFLibraryUri(ORFUriType.LIVE, "oe1")
+        library_uri = ORFLiveUri(station="oe1").uri
 
         client_mock = Mock()
         client_mock.get_live_url = Mock(return_value="result_uri")
         playback = ORFPlaybackProvider(None, None, client=client_mock)
 
-        result = playback.translate_uri(str(library_uri))
+        result = playback.translate_uri(library_uri)
 
         assert result == "result_uri"
 
@@ -33,14 +40,14 @@ class ORFLibraryUriTest(unittest.TestCase):
         audio_mock.set_uri = Mock()
 
         playback = ORFPlaybackProvider(audio_mock, None, client=None)
-        result = playback.translate_uri("invalid")
+        result = playback.translate_uri(Uri("invalid"))
 
         assert result is None
 
     def test_playback_unplayable_url(self):
-        library_uri = ORFLibraryUri(ORFUriType.STATION, "oe1")
+        library_uri = ORFStationUri(station="oe1").uri
         playback = ORFPlaybackProvider(None, None, client=None)
 
-        result = playback.translate_uri(str(library_uri))
+        result = playback.translate_uri(library_uri)
 
         assert result is None

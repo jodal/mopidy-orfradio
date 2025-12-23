@@ -1,3 +1,4 @@
+import datetime as dt
 import unittest
 from pathlib import Path
 
@@ -39,13 +40,20 @@ class ORFClientTest(unittest.TestCase):
         self.orf_client = ORFClient(self.http_client_mock)
 
     def test_get_day(self):
-        day = self.orf_client.get_day("oe1", "20170604")
+        day = self.orf_client.get_day(
+            station="oe1",
+            day=dt.date(2017, 6, 4),
+        )
         day = day[:1]  # only test against first show
 
         assert day == [{"id": "475617", "title": "Nachrichten", "time": "10:59"}]
 
     def test_get_show(self):
-        show = self.orf_client.get_show("oe1", "20170604", "475617")
+        show = self.orf_client.get_show(
+            station="oe1",
+            day=dt.date(2017, 6, 4),
+            show_id="475617",
+        )
 
         assert show == [
             {
@@ -61,7 +69,11 @@ class ORFClientTest(unittest.TestCase):
         ]
 
     def test_get_show_no_subitems(self):
-        show = self.orf_client.get_show("oe1", "20200406", "594692")
+        show = self.orf_client.get_show(
+            station="oe1",
+            day=dt.date(2020, 4, 6),
+            show_id="594692",
+        )
 
         assert show == [
             {
@@ -78,7 +90,11 @@ class ORFClientTest(unittest.TestCase):
 
     def test_get_show_zeroth_item(self):
         self.orf_client.media_types += ["S"]
-        show = self.orf_client.get_show("oe1", "20210412", "635031")
+        show = self.orf_client.get_show(
+            station="oe1",
+            day=dt.date(2021, 4, 12),
+            show_id="635031",
+        )
 
         assert show == [
             {
@@ -95,7 +111,10 @@ class ORFClientTest(unittest.TestCase):
 
     def test_get_item_broken_unicode(self):
         show = self.orf_client.get_item(
-            "fm4", "20200409", "4UP", "1586420063000-1586420268000"
+            station="fm4",
+            day=dt.date(2020, 4, 9),
+            show_id="4UP",
+            item_id="1586420063000-1586420268000",
         )
 
         assert show == {
@@ -111,7 +130,11 @@ class ORFClientTest(unittest.TestCase):
 
     def test_get_item_url_oe2(self):
         url = self.orf_client.get_item_url(
-            "wie", "oe2w", "20200615", "WXWOW", "1592222374000-1592222555000"
+            station="wie",
+            day=dt.date(2020, 6, 15),
+            show_id="WXWOW",
+            item_id="1592222374000-1592222555000",
+            loopstream_slug="oe2w",
         )
 
         assert (
