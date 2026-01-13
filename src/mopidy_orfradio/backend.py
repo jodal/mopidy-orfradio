@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar, cast
+from typing import ClassVar
 
 import pykka
 from mopidy import backend
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ORFBackend(pykka.ThreadingActor, backend.Backend):
     uri_schemes: ClassVar[list[UriScheme]] = [UriScheme("orfradio")]
-    config: config_lib.ConfigDict
+    config: config_lib.Config
 
     def __init__(
         self,
@@ -24,7 +24,7 @@ class ORFBackend(pykka.ThreadingActor, backend.Backend):
     ) -> None:
         super().__init__()
 
-        self.config = cast("config_lib.ConfigDict", config)
+        self.config = config
 
         self.library = ORFLibraryProvider(backend=self)
         self.playback = ORFPlaybackProvider(audio=audio, backend=self)
