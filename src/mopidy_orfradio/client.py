@@ -1,15 +1,19 @@
+from __future__ import annotations
+
 import datetime as dt
 import json
 import logging
 import re
-import urllib
-from typing import ClassVar
+import urllib.request
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import dateutil.parser
 from beaker.cache import CacheManager
 from beaker.util import parse_cache_config_options
+from mopidy.types import Uri
 
-from mopidy_orfradio import TZ
+if TYPE_CHECKING:
+    from mopidy_orfradio.backend import ORFBackend
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +24,7 @@ class HttpClient:
     cache = CacheManager(**parse_cache_config_options(cache_opts))
 
     @cache.cache("get", expire=300)
-    def get(self, url):
+    def get(self, url: str) -> str | None:
         logger.debug(f"Fetching data from {url!r}")
         if not url.startswith("http"):
             msg = f"Invalid URL: {url!r}"
@@ -32,8 +36,9 @@ class HttpClient:
             return content.decode(encoding)
         except Exception as exc:  # noqa: BLE001
             logger.error(f"Error fetching data from {url!r}: {exc}")  # noqa: TRY400
+            return None
 
-    def refresh(self):
+    def refresh(self) -> None:
         self.cache.invalidate(self.get, "get")
 
 
@@ -48,39 +53,63 @@ class ORFClient:
         192: "q2a",
     }
 
-    def __init__(self, http_client=HttpClient(), backend=None):  # noqa: B008
-        self.http_client = http_client
+    def __init__(
+        self,
+        http_client: HttpClient | None = None,
+        backend: ORFBackend | None = None,
+    ) -> None:
+        self.http_client = http_client or HttpClient()
         if backend:
-            self.media_types = backend.config["orfradio"]["archive_types"]
-            selected_bitrate = backend.config["orfradio"]["livestream_bitrate"]
+            self.media_types = backend.config["orfradio"]["archive_types"]  # type: ignore -- Fixed in mopidy >= 4.0.0a14
+            selected_bitrate = backend.config["orfradio"]["livestream_bitrate"]  # type: ignore -- Fixed in mopidy >= 4.0.0a14
             self.live_bitrate = self.bitrates[selected_bitrate]
         else:
             self.media_types = ["M", "B", "N"]
             self.live_bitrate = "q2a"
 
-    def get_day(self, station, day_id):
-        day_rec = self._get_day_json(station, day_id)
+    def get_day(
+        self,
+        *,
+        station: str,
+        day: dt.date,
+    ) -> list[dict[str, Any]]:
+        day_rec = self._get_day_json(
+            station=station,
+            day=day,
+        )
         if not day_rec:
             return []
 
-        def now(offset):
+        def now(offset: float) -> dt.datetime:
             return dt.datetime.now(dt.timezone(dt.timedelta(milliseconds=offset)))
 
         return [
             _to_show(broadcast_rec)
             for broadcast_rec in day_rec["broadcasts"]
-            if dateutil.parser.parse(broadcast_rec["startISO"])
-            < now(broadcast_rec["endOffset"])
+            if (
+                dateutil.parser.parse(broadcast_rec["startISO"])
+                < now(broadcast_rec["endOffset"])
+            )
         ]
 
-    def get_show(self, station, day_id, show_id):
-        show_rec = self._get_record_json(station, show_id, day_id)
+    def get_show(
+        self,
+        *,
+        station: str,
+        day: dt.date,
+        show_id: str,
+    ) -> list[dict[str, Any]]:
+        show_rec = self._get_record_json(
+            station=station,
+            day=day,
+            show_id=show_id,
+        )
         if not show_rec:
             return []
         # Sometimes the first item isn't at the beginning of the show, making
         # part of it inaccessible. So we add a fake "zeroth" item when that
         # happens:
-        show_date = _get_day_label(day_id)
+        show_date = f"{day:%a %Y-%m-%d}"
         first_item = next(iter(show_rec["items"]), None)
         if first_item and show_rec["start"] < first_item["start"]:
             show_rec["items"].insert(
@@ -127,70 +156,107 @@ class ORFClient:
 
         return items
 
-    def get_live_url(self, slug):
-        return ORFClient.live_uri % (slug, self.live_bitrate)
+    def get_live_url(self, *, station: str) -> Uri:
+        return Uri(ORFClient.live_uri % (station, self.live_bitrate))
 
-    def get_item(self, station, day_id, show_id, item_id):
-        show = self.get_show(station, day_id, show_id)
+    def get_item(
+        self,
+        *,
+        station: str,
+        day: dt.date,
+        show_id: str,
+        item_id: str,
+    ) -> dict[str, Any]:
+        show = self.get_show(
+            station=station,
+            day=day,
+            show_id=show_id,
+        )
         return next(
             item for item in show if item["id"].split("-")[0] == item_id.split("-")[0]
         )
 
-    def get_item_url(self, station, loopstream_slug, day_id, show_id, item_id):
-        json = self._get_record_json(station, show_id, day_id)
+    def get_item_url(
+        self,
+        *,
+        station: str,
+        day: dt.date,
+        show_id: str,
+        item_id: str,
+        loopstream_slug: str | None,
+    ) -> Uri | None:
+        if loopstream_slug is None:
+            return None
+
+        json = self._get_record_json(
+            station=station,
+            day=day,
+            show_id=show_id,
+        )
         if not json:
             return None
 
         streams = json["streams"]
         if len(streams) == 0:
-            return ""
+            return None
 
-        item_start, item_end, *_ = item_id.split("-", 1) + 1 * [None]
+        item_start, _, item_end = item_id.partition("-")
         stream = next(
             stream for stream in reversed(streams) if stream["start"] <= int(item_start)
         )
         stream_id = stream["loopStreamId"]
         offsetstart = int(item_start) - stream["start"]
         offsetende = int(item_end) - stream["start"] if item_end else ""
-        return ORFClient.show_uri % (
-            loopstream_slug,
-            stream_id,
-            offsetstart,
-            offsetende,
+        return Uri(
+            ORFClient.show_uri
+            % (
+                loopstream_slug,
+                stream_id,
+                offsetstart,
+                offsetende,
+            )
         )
 
-    def refresh(self):
+    def refresh(self) -> None:
         self.http_client.refresh()
 
-    def _get_json(self, uri):
+    def _get_json(self, uri: str) -> dict[str, Any] | None:
+        content = self.http_client.get(uri)
+        if content is None:
+            return None
         try:
-            content = self.http_client.get(uri)
             return json.loads(content)
         except Exception as exc:  # noqa: BLE001
             logger.error(f"Error decoding content received from {uri!r}: {exc}")  # noqa: TRY400
+            return None
 
-    def _get_archive_json(self, station):
+    def _get_archive_json(self, *, station: str) -> dict | None:
         return self._get_json(ORFClient.archive_uri % station)
 
-    def _get_day_json(self, station, day_id):
-        json = self._get_archive_json(station)
-        return next((rec for rec in json if _get_day_id(rec) == day_id), None)
+    def _get_day_json(
+        self,
+        *,
+        station: str,
+        day: dt.date,
+    ) -> dict[str, Any] | None:
+        json = self._get_archive_json(station=station)
+        if json is None:
+            return None
+        return next((rec for rec in json if str(rec["day"]) == f"{day:%Y%m%d}"), None)
 
-    def _get_record_json(self, station, program_key, day):
-        return self._get_json(ORFClient.record_uri % (station, program_key, day))
+    def _get_record_json(
+        self,
+        *,
+        station: str,
+        day: dt.date,
+        show_id: str,
+    ) -> dict[str, Any] | None:
+        return self._get_json(
+            ORFClient.record_uri % (station, show_id, f"{day:%Y%m%d}")
+        )
 
 
-def _get_day_id(day_rec):
-    return str(day_rec["day"])
-
-
-def _get_day_label(day_id):
-    # The day id is a string in the form "YYYYMMDD".
-    date = dt.datetime.strptime(day_id, "%Y%m%d").replace(tzinfo=TZ)
-    return date.strftime("%a %Y-%m-%d")
-
-
-def _to_show(rec):
+def _to_show(rec: dict[str, Any]) -> dict[str, Any]:
     time = dateutil.parser.parse(rec["scheduledISO"])
 
     # Note: items with times < 06:00 are from the next day and should be last
@@ -201,7 +267,7 @@ def _to_show(rec):
     }
 
 
-def _generic_title(track):
+def _generic_title(track: dict[str, Any]) -> str:
     types = {
         "M": "Musik ",
         "B": "Beitrag ",
@@ -214,7 +280,7 @@ def _generic_title(track):
     return types.get(track["type"], "") + "ohne Namen"
 
 
-def _generate_id(show_rec, i):
+def _generate_id(show_rec: dict[str, Any], i: int) -> str:
     start = show_rec["items"][i]["start"]
     if i + 1 < len(show_rec["items"]):
         end = show_rec["items"][i + 1]["start"]
@@ -222,7 +288,7 @@ def _generate_id(show_rec, i):
     return f"{start}"
 
 
-def _calculate_length(show_rec, i):
+def _calculate_length(show_rec: dict[str, Any], i: int) -> int:
     start = show_rec["items"][i]["start"]
     end = (
         show_rec["items"][i + 1]["start"]
@@ -232,7 +298,7 @@ def _calculate_length(show_rec, i):
     return end - start
 
 
-def _mojibake(s):
+def _mojibake(s: str) -> str:
     """
     The API sometimes returns titles with characters in the C1 control block.
     """

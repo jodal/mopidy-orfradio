@@ -15,7 +15,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "beaker",
-    "mopidy >= 3.0",
+    "mopidy >= 4.0.0a4",
     "pykka >= 4.1",
     "python-dateutil",
 ]
@@ -41,7 +41,7 @@ dev = [
 ]
 ruff = ["ruff"]
 tests = ["pytest", "pytest-cov"]
-typing = ["pyright"]
+typing = ["pyright", "ty"]
 
 
 [tool.coverage.paths]
@@ -79,11 +79,6 @@ target-version = "py313"
 select = ["ALL"]
 ignore = [
     # Add rules you want to ignore here
-    "ANN001", # missing-type-function-argument  # TODO
-    "ANN201", # missing-return-type-undocumented-public-function  # TODO
-    "ANN202", # missing-return-type-private-function  # TODO
-    "ANN204", # missing-return-type-special-method  # TODO
-    "ANN205", # missing-return-type-static-method  # TODO
     "D",      # pydocstyle
     "D203",   # one-blank-line-before-class
     "D213",   # multi-line-summary-second-line
@@ -98,6 +93,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [
+    "ANN",     # flake8-annotations
     "ARG",     # flake8-unused-arguments
     "D",       # pydocstyle
     "PLR2004", # magic-value-comparison  # TODO
@@ -120,6 +116,7 @@ env_list = [
     "pyright",
     "ruff-check",
     "ruff-format",
+    "ty",
 ]
 
 [tool.tox.env_run_base]
@@ -148,3 +145,7 @@ commands = [["ruff", "check", "{posargs:.}"]]
 skip_install = true
 dependency_groups = ["ruff"]
 commands = [["ruff", "format", "--check", "--diff", "{posargs:.}"]]
+
+[tool.tox.env.ty]
+dependency_groups = ["typing"]
+commands = [["ty", "check", "{posargs:src}"]]

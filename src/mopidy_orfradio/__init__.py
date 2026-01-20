@@ -25,7 +25,7 @@ class Extension(ext.Extension):
         schema["livestream_bitrate"] = config.Integer(choices=[128, 192])
         return schema
 
-    def setup(self, registry) -> None:
+    def setup(self, registry: ext.Registry) -> None:
         from mopidy_orfradio.backend import ORFBackend  # noqa: PLC0415
 
         registry.add("backend", ORFBackend)
