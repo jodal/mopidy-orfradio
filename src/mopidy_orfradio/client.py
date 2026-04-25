@@ -173,7 +173,9 @@ class ORFClient:
             show_id=show_id,
         )
         return next(
-            item for item in show if item["id"].split("-")[0] == item_id.split("-")[0]
+            item
+            for item in show
+            if item["id"].split("-")[0] == item_id.split("-", maxsplit=1)[0]
         )
 
     def get_item_url(
