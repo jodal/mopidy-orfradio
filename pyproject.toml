@@ -15,7 +15,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     "beaker",
-    "mopidy >= 4.0.0a4",
+    "mopidy >= 4.0.0",
     "pykka >= 4.1",
     "python-dateutil",
 ]
