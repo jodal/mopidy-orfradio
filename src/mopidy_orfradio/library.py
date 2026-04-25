@@ -51,7 +51,7 @@ class ORFLibraryProvider(backend.LibraryProvider):
                 name=station.name,
             )
             for station in STATIONS
-            if station.slug in self.backend.config["orfradio"]["stations"]  # type: ignore -- Fixed in mopidy >= 4.0.0a14
+            if station.slug in self.backend.config["orfradio"]["stations"]
         ]
 
     @override
@@ -109,7 +109,7 @@ class ORFLibraryProvider(backend.LibraryProvider):
         afterhours: bool = False,
     ) -> str:
         time = item["time"]
-        if afterhours and self.backend.config["orfradio"]["afterhours"]:  # type: ignore -- Fixed in mopidy >= 4.0.0a14
+        if afterhours and self.backend.config["orfradio"]["afterhours"]:
             time = re.sub(r"^0([0-4]:)", r"O\1", time)
         return "{}: {}".format(time, item["title"])
 
